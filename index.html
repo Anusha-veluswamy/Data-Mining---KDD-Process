@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KDD Data Visualizer</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style id="app-css">
+:root{--ink:#1f2340;--muted:#6b7090;--bg:#f5f6ff;--card:#fff;--line:#e7e9f7}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,'Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);background:radial-gradient(circle at 0 0,#ffe3f1 0,transparent 38%),radial-gradient(circle at 100% 0,#dfeaff 0,transparent 42%),radial-gradient(circle at 50% 100%,#e0fff4 0,transparent 40%),var(--bg);min-height:100vh}
+header{background:linear-gradient(120deg,#8338EC,#FF006E 55%,#FB5607);color:#fff;padding:18px 24px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(131,56,236,.3)}
+header h1{margin:0;font-size:22px;letter-spacing:.01em}
+header p{margin:3px 0 0;opacity:.92;font-size:13px}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:999px;padding:9px 16px;font-weight:700;cursor:pointer;background:#fff;color:#8338EC;box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:13px;transition:.15s;font-family:inherit}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(0,0,0,.16)}
+.btn.ghost{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:none}
+.btn.grad{background:linear-gradient(90deg,#3A86FF,#8338EC);color:#fff}
+.btn.pink{background:linear-gradient(90deg,#FF006E,#FB5607);color:#fff}
+.btn.green{background:linear-gradient(90deg,#06D6A0,#118AB2);color:#fff}
+.btn.sm{padding:6px 12px;font-size:12px}
+select,input[type=number],input[type=text],input[type=url]{border:1px solid var(--line);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;background:#fff;color:var(--ink)}
+header select{border:0;font-weight:600}
+main{max-width:1440px;margin:0 auto;padding:18px}
+.loader{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:14px}
+.drop{border:2.5px dashed #b9a6ff;border-radius:18px;padding:22px;text-align:center;background:linear-gradient(135deg,#fff,#f6f0ff);cursor:pointer;transition:.2s}
+.drop:hover,.drop.over{border-color:#FF006E;background:linear-gradient(135deg,#fff,#fff0f7)}
+.drop .big{font-size:34px}
+.drop b{color:#8338EC}
+.drop small{color:var(--muted)}
+.side{background:#fff;border-radius:18px;padding:16px;border:1px solid var(--line);box-shadow:0 4px 18px rgba(40,40,90,.06)}
+.side h4{margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.status{font-size:13px;color:var(--muted);margin:0 0 8px;padding-left:4px}
+.status b{color:var(--ink)}
+.pipeline{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:8px 2px 16px}
+.step{border:0;border-radius:14px;padding:10px 14px;color:#fff;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;opacity:.7;transition:.2s;font-size:14px;font-family:inherit}
+.step:hover{opacity:.9}
+.step.active{opacity:1;transform:translateY(-2px) scale(1.04);box-shadow:0 8px 20px rgba(0,0,0,.2)}
+.step .num{background:rgba(255,255,255,.3);border-radius:50%;width:24px;height:24px;display:grid;place-items:center;font-size:12px}
+.s0{background:linear-gradient(135deg,#5f6caf,#3a4a8c)}.s1{background:linear-gradient(135deg,#3A86FF,#118AB2)}.s2{background:linear-gradient(135deg,#8338EC,#B5179E)}.s3{background:linear-gradient(135deg,#FF006E,#F72585)}.s4{background:linear-gradient(135deg,#FB5607,#FFBE0B)}.s5{background:linear-gradient(135deg,#06D6A0,#118AB2)}
+.arr{color:#b0b4d6;font-style:normal;font-size:18px}
+.panel{display:none}.panel.active{display:block;animation:fade .3s}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 4px 18px rgba(40,40,90,.07);margin-bottom:16px;border:1px solid var(--line);min-width:0}
+.card h3{margin:0 0 10px;font-size:16px}
+.card h3 small{color:var(--muted);font-weight:500}
+.card.wide{grid-column:1/-1}
+.stephead{border-radius:18px;padding:16px 20px;color:#fff;margin-bottom:16px;box-shadow:0 6px 18px rgba(0,0,0,.1)}
+.stephead h2{margin:0;font-size:20px}.stephead p{margin:4px 0 0;opacity:.94;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:16px}
+.grid .card{margin:0}
+.chart{height:370px;width:100%}.chart.tall{height:500px}
+h2.sec{margin:26px 0 12px;font-size:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.kpi{border-radius:16px;padding:14px;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.1)}
+.kpi .v{font-size:26px;font-weight:800}.kpi .l{font-size:11px;opacity:.92;text-transform:uppercase;letter-spacing:.05em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:6px 11px;border-radius:999px;font-size:13px}
+.chip b{font-weight:600;opacity:.7;font-size:11px;margin-left:4px}
+.t-numeric{background:#e3eeff;color:#1f5fd1}.t-categorical{background:#ffe3f0;color:#c2185b}.t-date{background:#fff1dc;color:#c25e00}
+.tablewrap{overflow:auto;max-height:430px;border-radius:12px;border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{position:sticky;top:0;background:linear-gradient(90deg,#8338EC,#3A86FF);color:#fff;text-align:left;padding:8px 10px;white-space:nowrap;z-index:1}
+td{padding:6px 10px;border-bottom:1px solid #f0f1fa;white-space:nowrap}
+tr:nth-child(even) td{background:#fafaff}
+.na{color:#FF006E;font-weight:700}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px}
+.row label{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;font-weight:600}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:10px}
+.check{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;cursor:pointer;font-size:13px;font-weight:600}
+.check em{margin-left:auto;font-size:11px;opacity:.7;font-style:normal}
+.hint{color:var(--muted);font-size:13px;margin:0 0 10px}
+.log{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.log li{padding:10px 14px;border-radius:12px;background:#f6f3ff;border-left:5px solid #8338EC;font-size:14px}
+.insights{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.insights li{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:#fbfbff;border-left:6px solid;font-size:14px;line-height:1.45}
+.insights li span{font-size:20px}
+.empty{text-align:center;padding:50px;color:var(--muted)}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120px);background:linear-gradient(90deg,#8338EC,#FF006E);color:#fff;padding:12px 20px;border-radius:999px;font-weight:600;font-size:14px;transition:.35s;z-index:99;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:90vw}
+#toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:820px){.loader{grid-template-columns:1fr}.grid{grid-template-columns:1fr}main{padding:12px}header{padding:14px 16px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📊 KDD Data Visualizer</h1>
+    <p>Plug &amp; play · Data → Selection → Preprocessing → Transformation → Data Mining → Knowledge</p>
+  </div>
+  <div class="hbtns">
+    <select id="palette" title="Color palette"></select>
+    <button class="btn" id="dlHtml">⬇ Download dashboard (.html)</button>
+    <button class="btn ghost" id="dlCsv">⬇ Clean data (.csv)</button>
+  </div>
+</header>
+
+<main>
+  <section class="loader">
+    <div class="drop" id="drop">
+      <div class="big">📂</div>
+      <div><b>Drop any dataset here</b> or click to browse</div>
+      <small>CSV · TSV · TXT · Excel (.xlsx/.xls) · JSON — everything stays in your browser</small>
+      <input type="file" id="file" accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.xlsm,.ods" hidden>
+    </div>
+    <div class="side">
+      <h4>Try a sample</h4>
+      <div class="row">
+        <button class="btn grad sm" data-sample="students">🎓 Student performance</button>
+        <button class="btn pink sm" data-sample="sales">🛒 Retail sales</button>
+      </div>
+      <h4>Or load from a URL</h4>
+      <div class="row">
+        <input type="url" id="url" placeholder="https://…/data.csv" style="flex:1;min-width:160px">
+        <button class="btn green sm" id="loadUrl">Load</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="status" id="status"></p>
+
+  <nav class="pipeline">
+    <button class="step s0 active" data-tab="data"><span class="num">0</span>Data</button><i class="arr">➜</i>
+    <button class="step s1" data-tab="select"><span class="num">1</span>Selection</button><i class="arr">➜</i>
+    <button class="step s2" data-tab="prep"><span class="num">2</span>Preprocessing</button><i class="arr">➜</i>
+    <button class="step s3" data-tab="transform"><span class="num">3</span>Transformation</button><i class="arr">➜</i>
+    <button class="step s4" data-tab="mine"><span class="num">4</span>Data Mining</button><i class="arr">➜</i>
+    <button class="step s5" data-tab="interp"><span class="num">5</span>Interpretation → Knowledge</button>
+  </nav>
+
+  <section class="panel active" id="tab-data"></section>
+  <section class="panel" id="tab-select"></section>
+  <section class="panel" id="tab-prep"></section>
+  <section class="panel" id="tab-transform"></section>
+  <section class="panel" id="tab-mine"></section>
+  <section class="panel" id="tab-interp"></section>
+</main>
+<div id="toast"></div>
+
+<script>
+/* ============ helpers ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const MISSING=new Set(['','na','n/a','nan','null','?','-','#n/a','undefined']);
+const CL='kmeans_cluster';
+const PALETTES={
+  vivid:{name:'🎨 Vivid',c:['#FF006E','#8338EC','#3A86FF','#FB5607','#FFBE0B','#06D6A0','#F72585','#118AB2','#7209B7','#EF476F'],scale:[[0,'#3A86FF'],[.35,'#8338EC'],[.7,'#FF006E'],[1,'#FFBE0B']]},
+  rainbow:{name:'🌈 Rainbow',c:['#E63946','#F4A261','#E9C46A','#2A9D8F','#457B9D','#7B2CBF','#FF70A6','#70D6FF','#FF9770','#06D6A0'],scale:[[0,'#457B9D'],[.33,'#2A9D8F'],[.66,'#E9C46A'],[1,'#E63946']]},
+  ocean:{name:'🌊 Ocean',c:['#0077B6','#00B4D8','#2A9D8F','#48CAE4','#023E8A','#06D6A0','#90E0EF','#118AB2','#264653','#52B788'],scale:'Viridis'},
+  sunset:{name:'🌅 Sunset',c:['#F94144','#F3722C','#F8961E','#F9C74F','#90BE6D','#43AA8B','#577590','#F72585','#B5179E','#277DA1'],scale:'YlOrRd'},
+  candy:{name:'🍬 Candy',c:['#FF8FAB','#A06CD5','#6BCB77','#4D96FF','#FFD93D','#FF6B6B','#9ADCFF','#C77DFF','#FFB4A2','#80ED99'],scale:[[0,'#9ADCFF'],[.5,'#C77DFF'],[1,'#FF8FAB']]}
+};
+const CORR_SCALE=[[0,'#3A86FF'],[.5,'#ffffff'],[1,'#FF006E']];
+const KG=['linear-gradient(135deg,#3A86FF,#8338EC)','linear-gradient(135deg,#FF006E,#FB5607)','linear-gradient(135deg,#06D6A0,#118AB2)','linear-gradient(135deg,#FFBE0B,#FB5607)','linear-gradient(135deg,#8338EC,#F72585)','linear-gradient(135deg,#EF476F,#FFB703)','linear-gradient(135deg,#118AB2,#06D6A0)'];
+
+let RAW=[],COLS=[],TYPES={},NAME='';
+let TARGET=[],PRE=[],WORK=[],WCOLS=[],LOG=[];
+const S={selected:new Set(),rowLimit:0,missing:'none',dedupe:false,outliers:false,scaling:'none',palette:'vivid'};
+let B={},KM={},TR={},CLUSTER=null,currentTab='data';
+const CHARTS={};
+
+const pal=()=>PALETTES[S.palette].c;
+const SCALE=()=>PALETTES[S.palette].scale;
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const std=a=>{if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1));};
+const quant=(s,p)=>{const i=(s.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);};
+const median=a=>quant([...a].sort((x,y)=>x-y),.5);
+const mn=a=>a.reduce((x,y)=>y<x?y:x,Infinity);
+const mx=a=>a.reduce((x,y)=>y>x?y:x,-Infinity);
+const mode=a=>{const m=new Map();let best=null,bc=0;a.forEach(v=>{const c=(m.get(v)||0)+1;m.set(v,c);if(c>bc){bc=c;best=v;}});return best;};
+const skew=a=>{const m=mean(a),s=std(a);if(!s)return 0;return a.reduce((t,x)=>t+((x-m)/s)**3,0)/a.length;};
+const isId=c=>/(^|[^a-z])id$/i.test(c)||/^id$/i.test(c);
+const numCols=()=>WCOLS.filter(c=>TYPES[c]==='numeric');
+const numNo=()=>numCols().filter(c=>!isId(c));
+const catCols=()=>WCOLS.filter(c=>TYPES[c]==='categorical');
+const col=(c,rows=WORK)=>rows.map(r=>r[c]).filter(v=>v!==null&&v!==undefined);
+const uniq=(c,rows=WORK)=>new Set(col(c,rows)).size;
+function counts(c,rows=WORK){const m=new Map();rows.forEach(r=>{const v=r[c];if(v!==null&&v!==undefined)m.set(v,(m.get(v)||0)+1);});return [...m.entries()].sort((a,b)=>b[1]-a[1]);}
+const countMissing=(rows,cols)=>rows.reduce((s,r)=>s+cols.filter(c=>r[c]===null||r[c]===undefined).length,0);
+function fmt(v){if(v===null||v===undefined||(typeof v==='number'&&isNaN(v)))return '—';if(typeof v!=='number')return String(v);if(Math.abs(v)>=1000)return v.toLocaleString(undefined,{maximumFractionDigits:2});return Number.isInteger(v)?String(v):String(parseFloat(v.toFixed(3)));}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),3200);}
+const kpi=(l,v,i)=>`<div class="kpi" style="background:${KG[i%KG.length]}"><div class="v">${typeof v==='number'?v.toLocaleString():v}</div><div class="l">${l}</div></div>`;
+const stephead=(i,t,d)=>`<div class="stephead s${i}"><h2>${i?'Step '+i+' · ':''}${t}</h2><p>${d}</p></div>`;
+const opts=(list,sel,none)=>(none?`<option value="">(none)</option>`:'')+list.map(c=>`<option value="${esc(c)}" ${c===sel?'selected':''}>${esc(c)}</option>`).join('');
+function tableHTML(rows,cols){
+  if(!rows.length)return '<p class="hint">No rows.</p>';
+  return `<div class="tablewrap"><table><thead><tr><th>#</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td>${cols.map(c=>`<td>${r[c]===null||r[c]===undefined?'<span class="na">NA</span>':esc(fmt(r[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function plot(id,data,layout={},title=''){
+  const el=document.getElementById(id);if(!el||typeof Plotly==='undefined')return;
+  const L={title:{text:title,font:{size:15,color:'#1f2340'},x:0.03},paper_bgcolor:'#ffffff',plot_bgcolor:'#fafbff',
+    font:{family:'Inter, Segoe UI, sans-serif',color:'#2b2f4a',size:12},colorway:pal(),
+    margin:{t:title?52:24,l:60,r:24,b:60},legend:{orientation:'h',y:-0.22},hoverlabel:{font:{family:'Inter, Segoe UI, sans-serif'}},...layout};
+  CHARTS[id]={title,data,layout:L};
+  Plotly.react(el,data,L,{responsive:true,displaylogo:false,toImageButtonOptions:{format:'png',scale:2}});
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ============ sample datasets ============ */
+function sampleStudents(){
+  const r=mulberry32(42),g=()=>{let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());};
+  const majors=['Computer Science','Mathematics','Biology','Business','Physics'],years=['Freshman','Sophomore','Junior','Senior'];
+  const rows=[];
+  for(let i=1;i<=240;i++){
+    const major=majors[Math.floor(r()*majors.length)];
+    const study=Math.max(0,+(8+3*g()+(major==='Physics'?2:0)+(major==='Business'?-1.5:0)).toFixed(1));
+    const att=Math.round(Math.min(100,Math.max(40,85+8*g())));
+    const sleep=+(7+1.1*g()).toFixed(1);
+    const gpa=+Math.min(4,Math.max(1.5,3+0.45*g())).toFixed(2);
+    const score=+Math.min(100,Math.max(0,5+2.6*study+0.35*att+5*gpa+1.5*(sleep-7)+6*g())).toFixed(1);
+    const row={student_id:1000+i,major,year:years[Math.floor(r()*4)],study_hours_week:study,attendance_pct:att,sleep_hours:sleep,prev_gpa:gpa,final_score:score,passed:score>=60?'Yes':'No'};
+    if(r()<0.05)row.study_hours_week='';
+    if(r()<0.04)row.sleep_hours='NA';
+    if(r()<0.03)row.major='';
+    rows.push(row);
+  }
+  rows[17].study_hours_week=45;rows[120].sleep_hours=2.1;rows[200].attendance_pct=12;
+  rows.push({...rows[5]},{...rows[33]},{...rows[90]});
+  return rows;
+}
+function sampleSales(){
+  const r=mulberry32(7),p=n=>String(n).padStart(2,'0');
+  const regions=['North','South','East','West'],channels=['Online','Retail','Partner'];
+  const products={Laptop:950,Phone:700,Tablet:420,Monitor:260,Headphones:120};const names=Object.keys(products);
+  const rows=[];
+  for(let i=0;i<360;i++){
+    const d=new Date(2025,0,1+Math.floor(r()*365));const m=d.getMonth();
+    const season=m>=9?1.7:(m>=5&&m<=7?1.2:1);
+    const product=names[Math.floor(r()*names.length)],region=regions[Math.floor(r()*4)];
+    const units=1+Math.floor(r()*8*season)+(region==='West'?1:0);
+    const price=+(products[product]*(0.9+0.2*r())).toFixed(2);
+    const discount=[0,0,5,10,15,20][Math.floor(r()*6)];
+    const revenue=+(units*price*(1-discount/100)).toFixed(2);
+    const sat=Math.max(1,Math.min(5,Math.round(3.6+discount/20+(r()-0.5)*2)));
+    const row={order_id:'ORD-'+(5000+i),order_date:`${d.getFullYear()}-${p(m+1)}-${p(d.getDate())}`,region,channel:channels[Math.floor(r()*3)],product,units,unit_price:price,discount_pct:discount,revenue,customer_rating:sat};
+    if(r()<0.04)row.customer_rating='';
+    if(r()<0.03)row.channel='N/A';
+    rows.push(row);
+  }
+  return rows;
+}
+
+/* ============ loading ============ */
+function clean(v){if(v===undefined||v===null)return null;if(typeof v==='number')return isFinite(v)?v:null;if(typeof v==='boolean')return String(v);if(v instanceof Date)return v.toISOString().slice(0,10);if(typeof v==='object')return JSON.stringify(v);const s=String(v).trim();return MISSING.has(s.toLowerCase())?null:s;}
+const isNumStr=s=>{if(typeof s==='number')return true;const t=String(s).replace(/[,$%\s]/g,'');return t!==''&&!isNaN(Number(t));};
+function detect(){
+  TYPES={};
+  COLS.forEach(c=>{
+    const vals=RAW.map(r=>r[c]).filter(v=>v!==null);
+    if(!vals.length){TYPES[c]='categorical';return;}
+    if(vals.filter(isNumStr).length/vals.length>=0.9){
+      TYPES[c]='numeric';
+      RAW.forEach(r=>{if(r[c]!==null&&typeof r[c]!=='number'){const x=Number(String(r[c]).replace(/[,$%\s]/g,''));r[c]=isNaN(x)?null:x;}});
+      return;
+    }
+    const d=vals.filter(v=>/\d{1,4}[-\/.]\d{1,2}[-\/.]\d{1,4}/.test(v)&&!isNaN(Date.parse(String(v).replace(/\./g,'-')))).length;
+    TYPES[c]=d/vals.length>=0.9?'date':'categorical';
+  });
+}
+function flatten(o){if(o===null||typeof o!=='object')return {value:o};const out={};Object.entries(o).forEach(([k,v])=>{if(v&&typeof v==='object'&&!Array.isArray(v))Object.entries(v).forEach(([k2,v2])=>out[k+'.'+k2]=v2);else out[k]=v;});return out;}
+function loadRows(rows,nm){
+  if(!rows||!rows.length){toast('No rows found in that file');return;}
+  const keys=[],seen=new Set();
+  rows.slice(0,1000).forEach(r=>Object.keys(r).forEach(k=>{if(!seen.has(k)){seen.add(k);keys.push(k);}}));
+  COLS=keys.filter(k=>k!==''&&k!=='__parsed_extra');
+  RAW=rows.map(r=>{const o={};COLS.forEach(c=>o[c]=clean(r[c]));return o;});
+  NAME=nm;detect();
+  Object.assign(S,{selected:new Set(COLS),rowLimit:0,missing:'none',dedupe:false,outliers:false,scaling:'none'});
+  B={};KM={};TR={};
+  refresh();showTab('data');
+  toast(`Loaded ${nm}: ${RAW.length.toLocaleString()} rows × ${COLS.length} columns`);
+}
+function parseText(t,ext,nm){
+  try{
+    if(ext==='json'||(ext!=='csv'&&ext!=='tsv'&&/^\s*[\[{]/.test(t))){
+      let j=JSON.parse(t);
+      if(!Array.isArray(j)){const k=Object.keys(j).find(k=>Array.isArray(j[k]));j=k?j[k]:[j];}
+      loadRows(j.map(flatten),nm);
+    }else{
+      const r=Papa.parse(t.trim(),{header:true,skipEmptyLines:true,delimiter:ext==='tsv'?'\t':''});
+      loadRows(r.data,nm);
+    }
+  }catch(e){toast('Could not read file: '+e.message);}
+}
+function readFile(f){
+  const ext=f.name.split('.').pop().toLowerCase();
+  if(['xlsx','xls','xlsm','ods'].includes(ext)){
+    f.arrayBuffer().then(buf=>{const wb=XLSX.read(buf,{cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];loadRows(XLSX.utils.sheet_to_json(ws,{defval:null}),f.name);}).catch(e=>toast('Excel error: '+e.message));
+  }else f.text().then(t=>parseText(t,ext,f.name));
+}
+function loadUrl(){
+  const u=$('#url').value.trim();if(!u)return;
+  const nm=u.split('/').pop().split('?')[0]||'remote-data';const ext=nm.split('.').pop().toLowerCase();
+  fetch(u).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return ['xlsx','xls'].includes(ext)?r.arrayBuffer():r.text();})
+    .then(d=>{if(typeof d==='string')parseText(d,ext,nm);else{const wb=XLSX.read(d);loadRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null}),nm);}})
+    .catch(e=>toast('Could not load URL ('+e.message+'). The site may block cross-origin downloads — save the file and drop it in instead.'));
+}
+
+/* ============ KDD pipeline ============ */
+function runPipeline(){
+  LOG=[];CLUSTER=null;
+  let rows=RAW;
+  if(S.rowLimit>0&&S.rowLimit<rows.length){rows=rows.slice(0,S.rowLimit);LOG.push(`Selection: kept the first ${S.rowLimit.toLocaleString()} rows`);}
+  WCOLS=COLS.filter(c=>S.selected.has(c));
+  LOG.push(`Selection: using ${WCOLS.length} of ${COLS.length} columns`);
+  rows=rows.map(r=>{const o={};WCOLS.forEach(c=>o[c]=r[c]);return o;});
+  TARGET=rows;
+  if(S.dedupe){const b=rows.length,seen=new Set();rows=rows.filter(r=>{const k=JSON.stringify(r);if(seen.has(k))return false;seen.add(k);return true;});LOG.push(`Preprocessing: removed ${b-rows.length} duplicate rows`);}
+  if(S.missing==='drop'){const b=rows.length;rows=rows.filter(r=>WCOLS.every(c=>r[c]!==null));LOG.push(`Preprocessing: dropped ${b-rows.length} rows containing missing values`);}
+  else if(S.missing!=='none'){
+    let filled=0;rows=rows.map(r=>({...r}));
+    WCOLS.forEach(c=>{
+      const v=rows.map(r=>r[c]).filter(x=>x!==null);if(!v.length)return;
+      const f=(TYPES[c]==='numeric'&&S.missing!=='mode')?(S.missing==='mean'?+mean(v).toFixed(4):median(v)):mode(v);
+      rows.forEach(r=>{if(r[c]===null){r[c]=f;filled++;}});
+    });
+    LOG.push(`Preprocessing: filled ${filled} missing cells (numeric → ${S.missing}, categorical → most frequent)`);
+  }
+  if(S.outliers){
+    const b=rows.length;
+    WCOLS.filter(c=>TYPES[c]==='numeric'&&!isId(c)).forEach(c=>{
+      const v=rows.map(r=>r[c]).filter(x=>x!==null).sort((a,b)=>a-b);if(v.length<4)return;
+      const q1=quant(v,.25),q3=quant(v,.75),iqr=q3-q1,lo=q1-1.5*iqr,hi=q3+1.5*iqr;
+      rows=rows.filter(r=>r[c]===null||(r[c]>=lo&&r[c]<=hi));
+    });
+    LOG.push(`Preprocessing: removed ${b-rows.length} outlier rows (1.5×IQR rule)`);
+  }
+  PRE=rows;
+  if(S.scaling!=='none'){
+    const nc=WCOLS.filter(c=>TYPES[c]==='numeric'&&!isId(c)),P={};
+    nc.forEach(c=>{const v=rows.map(r=>r[c]).filter(x=>x!==null);if(v.length)P[c]={min:mn(v),max:mx(v),m:mean(v),s:std(v)};});
+    rows=rows.map(r=>{const o={...r};nc.forEach(c=>{const x=r[c],p=P[c];if(x===null||!p)return;
+      if(S.scaling==='minmax')o[c]=p.max>p.min?(x-p.min)/(p.max-p.min):0;
+      else if(S.scaling==='zscore')o[c]=p.s>0?(x-p.m)/p.s:0;
+      else o[c]=Math.sign(x)*Math.log1p(Math.abs(x));});return o;});
+    LOG.push(`Transformation: ${({minmax:'Min-Max scaling (0–1)',zscore:'Z-score standardization',log:'log(1+|x|) transform'})[S.scaling]} on ${nc.length} numeric columns`);
+  }
+  WORK=rows;
+}
+function refresh(){runPipeline();updateStatus();RENDER[currentTab]();}
+function updateStatus(){
+  $('#status').innerHTML=RAW.length?`Dataset: <b>${esc(NAME)}</b> · ${RAW.length.toLocaleString()} raw rows → <b>${WORK.length.toLocaleString()}</b> rows after pipeline · <b>${WCOLS.length}</b> columns`:'No dataset loaded yet.';
+}
+function guard(p){if(!RAW.length){p.innerHTML='<div class="card empty">📂 Load a dataset or pick a sample to begin.</div>';return false;}if(!WCOLS.length){p.innerHTML='<div class="card empty">No columns selected — go back to <b>Selection</b> and pick some.</div>';return false;}return true;}
+function groupRows(rows,c,limit=12){
+  const top=counts(c,rows).slice(0,limit).map(x=>x[0]),set=new Set(top),m=new Map(top.map(k=>[k,[]]));let other=[];
+  rows.forEach(r=>{const v=r[c];if(v===null||v===undefined)return;if(set.has(v))m.get(v).push(r);else other.push(r);});
+  const out=[...m.entries()];if(other.length)out.push(['Other',other]);return out;
+}
+function pearson(a,b,rows=WORK){let n=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;for(const r of rows){const x=r[a],y=r[b];if(typeof x!=='number'||typeof y!=='number')continue;n++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;}if(n<3)return NaN;const cov=sxy-sx*sy/n,vx=sxx-sx*sx/n,vy=syy-sy*sy/n;return vx>0&&vy>0?cov/Math.sqrt(vx*vy):NaN;}
+function corrPairs(){const nc=numNo().slice(0,25),out=[];for(let i=0;i<nc.length;i++)for(let j=i+1;j<nc.length;j++){const r=pearson(nc[i],nc[j]);if(!isNaN(r))out.push([nc[i],nc[j],r]);}return out.sort((a,b)=>Math.abs(b[2])-Math.abs(a[2]));}
+
+/* ============ Step 0: Data ============ */
+function renderData(){
+  const p=$('#tab-data');
+  if(!RAW.length){p.innerHTML='<div class="card empty">📂 Load a dataset or pick a sample to begin.</div>';return;}
+  const miss=countMissing(RAW,COLS),dup=RAW.length-new Set(RAW.map(r=>JSON.stringify(r))).size,cnt=t=>COLS.filter(c=>TYPES[c]===t).length;
+  p.innerHTML=stephead(0,'Raw Data','A first look at what you loaded: size, column types, missing values and a preview.')+
+  `<div class="kpis">${kpi('Rows',RAW.length,0)}${kpi('Columns',COLS.length,1)}${kpi('Numeric',cnt('numeric'),2)}${kpi('Categorical',cnt('categorical'),3)}${kpi('Date',cnt('date'),4)}${kpi('Missing cells',miss,5)}${kpi('Duplicate rows',dup,6)}</div>
+  <div class="card"><h3>Detected column types</h3><div class="chips">${COLS.map(c=>`<span class="chip t-${TYPES[c]}">${esc(c)}<b>${TYPES[c]}</b></span>`).join('')}</div></div>
+  <div class="grid"><div class="card"><div class="chart" id="data-types"></div></div><div class="card"><div class="chart" id="data-missing"></div></div></div>
+  <div class="card"><h3>Raw data preview <small>(first 100 rows)</small></h3>${tableHTML(RAW.slice(0,100),COLS)}</div>`;
+  const tc={numeric:'#3A86FF',categorical:'#FF006E',date:'#FB5607'},tk=['numeric','categorical','date'].filter(t=>cnt(t));
+  plot('data-types',[{type:'pie',labels:tk,values:tk.map(cnt),hole:.5,marker:{colors:tk.map(t=>tc[t]),line:{color:'#fff',width:3}},textinfo:'label+value'}],{showlegend:false},'Column types');
+  const P=pal(),mv=COLS.map(c=>RAW.filter(r=>r[c]===null).length);
+  plot('data-missing',[{type:'bar',x:COLS,y:mv,marker:{color:COLS.map((_,i)=>P[i%P.length])},text:mv.map(v=>v||''),textposition:'outside'}],{xaxis:{type:'category',automargin:true},yaxis:{title:{text:'missing cells'}}},'Missing values per column');
+}
+
+/* ============ Step 1: Selection ============ */
+function renderSelection(){
+  const p=$('#tab-select');
+  if(!RAW.length){p.innerHTML='<div class="card empty">📂 Load a dataset first.</div>';return;}
+  p.innerHTML=stephead(1,'Selection','Choose the target data — the columns (and rows) relevant to your question.')+
+  `<div class="card"><div class="row">
+    <button class="btn grad sm" id="selAll">Select all</button><button class="btn pink sm" id="selNone">Select none</button>
+    <button class="btn green sm" id="selNum">Numeric only</button><button class="btn sm" id="selNoId">Drop ID columns</button>
+    <label>Use first <input type="number" id="rowLimit" min="0" style="width:110px" value="${S.rowLimit||''}" placeholder="all"> rows</label></div>
+    <div class="checks">${COLS.map((c,i)=>`<label class="check t-${TYPES[c]}"><input type="checkbox" data-col="${i}" ${S.selected.has(c)?'checked':''}><span>${esc(c)}</span><em>${TYPES[c]}</em></label>`).join('')}</div>
+    <p class="hint">Tip: you can override a detected type below if a column was guessed wrong.</p>
+    <div class="row">${COLS.map((c,i)=>`<label>${esc(c)} <select data-type="${i}">${['numeric','categorical','date'].map(t=>`<option ${TYPES[c]===t?'selected':''}>${t}</option>`).join('')}</select></label>`).join('')}</div></div>
+  <div class="card"><h3>Target data preview <small>(first 50 rows)</small></h3>${tableHTML(TARGET.slice(0,50),WCOLS)}</div>`;
+  p.querySelectorAll('[data-col]').forEach(cb=>cb.onchange=()=>{const c=COLS[+cb.dataset.col];cb.checked?S.selected.add(c):S.selected.delete(c);refresh();});
+  p.querySelectorAll('[data-type]').forEach(sel=>sel.onchange=()=>{const c=COLS[+sel.dataset.type],t=sel.value;
+    if(t==='numeric')RAW.forEach(r=>{if(r[c]!==null&&typeof r[c]!=='number'){const x=Number(String(r[c]).replace(/[,$%\s]/g,''));r[c]=isNaN(x)?null:x;}});
+    else RAW.forEach(r=>{if(typeof r[c]==='number')r[c]=String(r[c]);});
+    TYPES[c]=t;refresh();});
+  $('#selAll').onclick=()=>{S.selected=new Set(COLS);refresh();};
+  $('#selNone').onclick=()=>{S.selected=new Set();refresh();};
+  $('#selNum').onclick=()=>{S.selected=new Set(COLS.filter(c=>TYPES[c]==='numeric'));refresh();};
+  $('#selNoId').onclick=()=>{COLS.filter(isId).forEach(c=>S.selected.delete(c));refresh();};
+  $('#rowLimit').onchange=e=>{S.rowLimit=Math.max(0,parseInt(e.target.value)||0);refresh();};
+}
+
+/* ============ Step 2: Preprocessing ============ */
+function renderPrep(){
+  const p=$('#tab-prep');if(!guard(p))return;
+  const nc=numNo().slice(0,8);
+  p.innerHTML=stephead(2,'Preprocessing','Clean the target data: handle missing values, duplicates and outliers.')+
+  `<div class="card"><div class="row">
+    <label>Missing values <select id="pMiss">${[['none','Keep as is'],['drop','Drop rows with any missing'],['mean','Fill numeric with mean'],['median','Fill numeric with median'],['mode','Fill everything with mode']].map(([v,t])=>`<option value="${v}" ${S.missing===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label><input type="checkbox" id="pDup" ${S.dedupe?'checked':''}> Remove duplicate rows</label>
+    <label><input type="checkbox" id="pOut" ${S.outliers?'checked':''}> Remove outliers (1.5×IQR)</label></div>
+    <ul class="log">${LOG.filter(l=>l.startsWith('Preprocessing')).map(l=>`<li>${esc(l)}</li>`).join('')||'<li>No cleaning applied yet — choose an option above.</li>'}</ul></div>
+  <div class="kpis">${kpi('Target rows',TARGET.length,0)}${kpi('After cleaning',PRE.length,2)}${kpi('Rows removed',TARGET.length-PRE.length,1)}${kpi('Missing before',countMissing(TARGET,WCOLS),3)}${kpi('Missing after',countMissing(PRE,WCOLS),4)}</div>
+  <div class="grid"><div class="card wide"><div class="chart" id="prep-missing"></div></div>${nc.map((c,i)=>`<div class="card"><div class="chart" id="prep-box-${i}"></div></div>`).join('')}</div>`;
+  $('#pMiss').onchange=e=>{S.missing=e.target.value;refresh();};
+  $('#pDup').onchange=e=>{S.dedupe=e.target.checked;refresh();};
+  $('#pOut').onchange=e=>{S.outliers=e.target.checked;refresh();};
+  const pct=(rows,c)=>rows.length?100*rows.filter(r=>r[c]===null).length/rows.length:0;
+  plot('prep-missing',[
+    {type:'bar',name:'Before',x:WCOLS,y:WCOLS.map(c=>pct(TARGET,c)),marker:{color:'#FF006E'}},
+    {type:'bar',name:'After',x:WCOLS,y:WCOLS.map(c=>pct(PRE,c)),marker:{color:'#06D6A0'}}],
+    {barmode:'group',xaxis:{type:'category',automargin:true},yaxis:{title:{text:'% missing'}}},'Missing values: before vs after cleaning');
+  nc.forEach((c,i)=>plot(`prep-box-${i}`,[
+    {type:'box',name:'Before',y:col(c,TARGET),marker:{color:'#8338EC'},boxmean:true},
+    {type:'box',name:'After',y:col(c,PRE),marker:{color:'#FB5607'},boxmean:true}],{showlegend:false},`${c}: outlier check`));
+}
+
+/* ============ Step 3: Transformation ============ */
+function renderTransform(){
+  const p=$('#tab-transform');if(!guard(p))return;
+  const nc=numNo();
+  if(!TR.col||!nc.includes(TR.col))TR.col=nc[0];
+  const desc={none:'No scaling — values stay in their original units.',minmax:'Min-Max rescales every numeric column to the range 0 – 1, so features with big units no longer dominate.',zscore:'Z-score centres each column at mean 0 with standard deviation 1 — the usual choice before distance-based mining like k-means.',log:'log(1+|x|) compresses large values and reduces right skew (keeps the sign).'};
+  p.innerHTML=stephead(3,'Transformation','Reshape the cleaned data so features are comparable and ready for mining.')+
+  `<div class="card"><div class="row">
+    <label>Scaling <select id="tScale">${[['none','None'],['minmax','Min-Max (0–1)'],['zscore','Z-score standardization'],['log','Log transform']].map(([v,t])=>`<option value="${v}" ${S.scaling===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    ${nc.length?`<label>Inspect column <select id="tCol">${opts(nc,TR.col)}</select></label>`:''}</div>
+    <p class="hint">${desc[S.scaling]}</p></div>`+
+  (nc.length?`<div class="grid"><div class="card"><div class="chart" id="tr-before"></div></div><div class="card"><div class="chart" id="tr-after"></div></div><div class="card wide"><div class="chart" id="tr-all"></div></div></div>`:'<div class="card empty">No numeric columns to transform.</div>')+
+  `<div class="card"><h3>Transformed data preview <small>(first 50 rows)</small></h3>${tableHTML(WORK.slice(0,50),WCOLS)}</div>`;
+  $('#tScale').onchange=e=>{S.scaling=e.target.value;refresh();};
+  if(!nc.length)return;
+  $('#tCol').onchange=e=>{TR.col=e.target.value;renderTransform();};
+  const P=pal();
+  plot('tr-before',[{type:'histogram',x:col(TR.col,PRE),marker:{color:P[1],line:{color:'#fff',width:1}}}],{xaxis:{title:{text:TR.col}},yaxis:{title:{text:'count'}}},`Before: ${TR.col}`);
+  plot('tr-after',[{type:'histogram',x:col(TR.col,WORK),marker:{color:P[0],line:{color:'#fff',width:1}}}],{xaxis:{title:{text:TR.col+(S.scaling==='none'?'':' ('+S.scaling+')')}},yaxis:{title:{text:'count'}}},`After: ${TR.col}`);
+  plot('tr-all',nc.slice(0,15).map((c,i)=>({type:'box',name:c,y:col(c),marker:{color:P[i%P.length]}})),{showlegend:false},'All numeric columns after transformation');
+}
+
+/* ============ Step 4: Data Mining ============ */
+function ensureB(){
+  const all=WCOLS,nn=numNo(),cc=catCols().filter(c=>uniq(c)<=40);
+  if(!B.type)B.type='auto';
+  if(!B.x||!all.includes(B.x))B.x=cc[0]||nn[0]||all[0];
+  if(B.y===undefined||(B.y&&!all.includes(B.y)))B.y=nn.find(c=>c!==B.x)||'';
+  if(B.z===undefined||(B.z&&!all.includes(B.z)))B.z=nn.find(c=>c!==B.x&&c!==B.y)||'';
+  if(B.color===undefined||(B.color&&!all.includes(B.color)))B.color='';
+  if(!B.agg)B.agg='mean';if(!B.bucket)B.bucket='month';
+}
+function autoType(x,y){
+  const tx=TYPES[x],ty=y?TYPES[y]:null;
+  if(!y)return tx==='numeric'?'histogram':tx==='date'?'line':'bar';
+  if(tx==='date'&&ty==='numeric')return 'line';
+  if(tx==='numeric'&&ty==='numeric')return 'scatter';
+  if(tx!=='numeric'&&ty==='numeric')return 'bar';
+  if(tx==='numeric')return 'box';
+  return 'heatmap';
+}
+function keyOf(r,x,bucket){
+  const v=r[x];if(v===null||v===undefined)return null;if(TYPES[x]!=='date')return v;
+  const s=String(v),p=n=>String(n).padStart(2,'0');let y,m,d;const iso=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(iso){y=+iso[1];m=+iso[2];d=+iso[3];}else{const t=new Date(s);if(isNaN(t))return s;y=t.getFullYear();m=t.getMonth()+1;d=t.getDate();}
+  return bucket==='year'?String(y):bucket==='day'?`${y}-${p(m)}-${p(d)}`:`${y}-${p(m)}`;
+}
+function drawBuilder(){
+  const el=$('#mine-builder'),msg=$('#bMsg');if(!el)return;msg.textContent='';
+  const {x,y,z,color,agg,bucket}=B;let type=B.type==='auto'?autoType(x,y):B.type;
+  const P=pal(),rows=WORK,isNum=c=>c&&TYPES[c]==='numeric';
+  const groups=(color&&color!==x&&!isNum(color))?groupRows(rows,color,12):[[null,rows]];const multi=groups.length>1;
+  let data=[],layout={xaxis:{title:{text:x},automargin:true},yaxis:{title:{text:y||'count'},automargin:true}},title='';
+  const fail=m=>{msg.textContent='⚠️ '+m;Plotly.purge(el);delete CHARTS['mine-builder'];};
+  if(['bar','hbar','line','area','pie'].includes(type)){
+    const keyF=r=>keyOf(r,x,bucket),cnt=new Map();rows.forEach(r=>{const k=keyF(r);if(k!==null)cnt.set(k,(cnt.get(k)||0)+1);});
+    let keys=[...cnt.keys()];
+    if(TYPES[x]==='numeric')keys.sort((a,b)=>a-b);else if(TYPES[x]==='date')keys.sort();else keys=keys.sort((a,b)=>cnt.get(b)-cnt.get(a)).slice(0,40);
+    const useY=y&&isNum(y)&&agg!=='count';
+    const aggF=rs=>{if(!rs||!rs.length)return null;if(!useY)return rs.length;const v=rs.map(r=>r[y]).filter(t=>typeof t==='number');if(!v.length)return null;
+      return agg==='sum'?v.reduce((a,b)=>a+b,0):agg==='mean'?mean(v):agg==='median'?median(v):agg==='min'?mn(v):mx(v);};
+    const byKey=rs=>{const m=new Map();rs.forEach(r=>{const k=keyF(r);if(k===null)return;if(!m.has(k))m.set(k,[]);m.get(k).push(r);});return m;};
+    const aggName=useY?{sum:'Total',mean:'Average',median:'Median',min:'Minimum',max:'Maximum'}[agg]+' '+y:'Count of rows';
+    title=`${aggName} by ${x}${multi?' and '+color:''}`;
+    if(type==='pie'){const m=byKey(rows);data=[{type:'pie',labels:keys,values:keys.map(k=>aggF(m.get(k))),hole:.45,sort:false,marker:{colors:keys.map((_,i)=>P[i%P.length]),line:{color:'#fff',width:2}},textinfo:'label+percent'}];layout={showlegend:keys.length<=12};}
+    else{
+      groups.forEach(([g,rs],i)=>{const m=byKey(rs),yv=keys.map(k=>aggF(m.get(k))),c=P[i%P.length],t={name:g===null?aggName:String(g)};
+        if(type==='bar'||type==='hbar'){Object.assign(t,{type:'bar',marker:{color:multi?c:keys.map((_,j)=>P[j%P.length]),line:{color:'#fff',width:1}}});if(type==='hbar'){t.orientation='h';t.y=keys;t.x=yv;}else{t.x=keys;t.y=yv;}}
+        else Object.assign(t,{type:'scatter',mode:'lines+markers',x:keys,y:yv,connectgaps:true,line:{color:c,width:3,shape:'spline'},marker:{size:7,color:c},fill:type==='area'?(multi?'tonexty':'tozeroy'):undefined});
+        data.push(t);});
+      layout.barmode='group';layout.showlegend=multi;layout.yaxis.title.text=aggName;
+      if(TYPES[x]==='categorical')layout.xaxis.type='category';
+      if(type==='hbar')layout={...layout,xaxis:{title:{text:aggName}},yaxis:{autorange:'reversed',automargin:true,type:'category'}};
+    }
+  }else if(type==='scatter'||type==='bubble'){
+    if(!y)return fail('Scatter needs a Y column.');
+    let sizeF=null;if(type==='bubble'){if(!isNum(z))return fail('Bubble needs a numeric Z (size) column.');const v=col(z),lo=mn(v),hi=mx(v);sizeF=t=>t===null?6:8+34*((t-lo)/((hi-lo)||1));}
+    const mk=(rs,c)=>({type:'scatter',mode:'markers',x:rs.map(r=>r[x]),y:rs.map(r=>r[y]),marker:{color:c,size:sizeF?rs.map(r=>sizeF(r[z])):9,opacity:.78,line:{color:'#fff',width:.7}}});
+    if(isNum(color)){const rs=rows.filter(r=>r[x]!==null&&r[y]!==null);const t=mk(rs,rs.map(r=>r[color]));Object.assign(t.marker,{colorscale:SCALE(),showscale:true,colorbar:{title:{text:color}}});t.name=color;data=[t];}
+    else groups.forEach(([g,rs],i)=>{rs=rs.filter(r=>r[x]!==null&&r[y]!==null);const t=mk(rs,P[i%P.length]);t.name=g===null?`${y} vs ${x}`:String(g);data.push(t);});
+    if(isNum(x)&&isNum(y)){const pts=rows.filter(r=>typeof r[x]==='number'&&typeof r[y]==='number');if(pts.length>2){const xs=pts.map(r=>r[x]),ys=pts.map(r=>r[y]),mxv=mean(xs),myv=mean(ys);let sxy=0,sxx=0;xs.forEach((v,i)=>{sxy+=(v-mxv)*(ys[i]-myv);sxx+=(v-mxv)**2;});const b=sxx?sxy/sxx:0,a=myv-b*mxv,lo=mn(xs),hi=mx(xs);
+      data.push({type:'scatter',mode:'lines',name:`Trend (r = ${pearson(x,y).toFixed(2)})`,x:[lo,hi],y:[a+b*lo,a+b*hi],line:{color:'#1f2340',width:2.5,dash:'dash'}});}}
+    title=`${y} vs ${x}${type==='bubble'?` (bubble size = ${z})`:''}${color?' · coloured by '+color:''}`;layout.showlegend=data.length>1;
+  }else if(type==='histogram'){
+    groups.forEach(([g,rs],i)=>data.push({type:'histogram',name:g===null?x:String(g),x:col(x,rs),opacity:multi?.7:.95,marker:{color:P[i%P.length],line:{color:'#fff',width:1}}}));
+    layout={barmode:multi?'overlay':'relative',xaxis:{title:{text:x}},yaxis:{title:{text:'count'}},showlegend:multi};title=`Distribution of ${x}${multi?' by '+color:''}`;
+  }else if(type==='box'||type==='violin'){
+    const v=isNum(y)?y:(isNum(x)?x:null);if(!v)return fail('Box/violin needs a numeric column in X or Y.');
+    const g=[x,y,color].find(c=>c&&c!==v&&!isNum(c));const gs=g?groupRows(rows,g,20):[[null,rows]];
+    gs.forEach(([k,rs],i)=>data.push(type==='box'?{type:'box',name:k===null?v:String(k),y:col(v,rs),boxmean:true,marker:{color:P[i%P.length]}}:{type:'violin',name:k===null?v:String(k),y:col(v,rs),box:{visible:true},meanline:{visible:true},line:{color:P[i%P.length]},fillcolor:P[i%P.length],opacity:.7}));
+    layout={showlegend:false,yaxis:{title:{text:v}},xaxis:{type:'category'}};title=`${v}${g?' by '+g:''}`;
+  }else if(type==='heatmap'){
+    const b=y||color;if(!b)return fail('Heatmap needs a second column (Y or Colour).');
+    if(isNum(x)&&isNum(b)){const rs=rows.filter(r=>r[x]!==null&&r[b]!==null);data=[{type:'histogram2d',x:rs.map(r=>r[x]),y:rs.map(r=>r[b]),colorscale:SCALE(),nbinsx:25,nbinsy:25}];title=`Density of ${b} vs ${x}`;layout.yaxis.title.text=b;}
+    else{const ka=counts(x).slice(0,20).map(k=>k[0]),kb=counts(b).slice(0,20).map(k=>k[0]),ia=new Map(ka.map((k,i)=>[k,i])),ib=new Map(kb.map((k,i)=>[k,i]));
+      const Z=kb.map(()=>ka.map(()=>0));rows.forEach(r=>{const i=ia.get(r[x]),j=ib.get(r[b]);if(i!==undefined&&j!==undefined)Z[j][i]++;});
+      data=[{type:'heatmap',x:ka.map(String),y:kb.map(String),z:Z,colorscale:SCALE(),texttemplate:'%{z}'}];title=`${x} × ${b} (row counts)`;layout={xaxis:{type:'category',title:{text:x}},yaxis:{type:'category',title:{text:b}}};}
+  }else if(type==='scatter3d'){
+    if(!isNum(x)||!isNum(y)||!isNum(z))return fail('3D scatter needs numeric X, Y and Z.');
+    groups.forEach(([g,rs],i)=>{rs=rs.filter(r=>r[x]!==null&&r[y]!==null&&r[z]!==null);data.push({type:'scatter3d',mode:'markers',name:g===null?'points':String(g),x:rs.map(r=>r[x]),y:rs.map(r=>r[y]),z:rs.map(r=>r[z]),marker:{size:4,color:P[i%P.length],opacity:.85}});});
+    layout={scene:{xaxis:{title:{text:x}},yaxis:{title:{text:y}},zaxis:{title:{text:z}}},margin:{l:0,r:0,t:50,b:0},showlegend:multi};title=`${x} · ${y} · ${z}`;
+  }else if(type==='sunburst'){
+    const b=color||(y&&!isNum(y)?y:'');const ids=[],labels=[],parents=[],values=[];
+    groupRows(rows,x,15).forEach(([k,rs])=>{const id=String(k);ids.push(id);labels.push(id);parents.push('');values.push(rs.length);
+      if(b)groupRows(rs,b,10).forEach(([k2,rs2])=>{ids.push(id+' / '+k2);labels.push(String(k2));parents.push(id);values.push(rs2.length);});});
+    data=[{type:'sunburst',ids,labels,parents,values,branchvalues:'total',marker:{colors:ids.map((_,i)=>P[i%P.length])}}];layout={margin:{t:50,l:10,r:10,b:10}};title=`${x}${b?' → '+b:''} (row counts)`;
+  }
+  if(!data.length)return fail('Pick columns that fit this chart type.');
+  plot('mine-builder',data,layout,title);
+}
+function kmeans(X,k,seed=7){
+  const rng=mulberry32(seed),n=X.length,d=X[0].length;
+  const dist=(a,b)=>{let s=0;for(let j=0;j<d;j++){const t=a[j]-b[j];s+=t*t;}return s;};
+  const C=[X[Math.floor(rng()*n)].slice()];
+  while(C.length<k){const D=X.map(x=>{let m=Infinity;for(const c of C){const v=dist(x,c);if(v<m)m=v;}return m;});const tot=D.reduce((a,b)=>a+b,0);let r=rng()*tot,i=0;while(i<n-1&&(r-=D[i])>0)i++;C.push(X[i].slice());}
+  const L=new Array(n).fill(-1);
+  for(let it=0;it<100;it++){
+    let ch=false;
+    for(let i=0;i<n;i++){let b=0,bd=Infinity;for(let c=0;c<k;c++){const v=dist(X[i],C[c]);if(v<bd){bd=v;b=c;}}if(L[i]!==b){L[i]=b;ch=true;}}
+    const Sm=Array.from({length:k},()=>new Array(d).fill(0)),N=new Array(k).fill(0);
+    for(let i=0;i<n;i++){N[L[i]]++;for(let j=0;j<d;j++)Sm[L[i]][j]+=X[i][j];}
+    for(let c=0;c<k;c++)if(N[c])C[c]=Sm[c].map(s=>s/N[c]);
+    if(!ch)break;
+  }
+  let inertia=0;for(let i=0;i<n;i++)inertia+=dist(X[i],C[L[i]]);
+  return {labels:L,inertia};
+}
+function runKM(){
+  const feats=(KM.feats||[]).filter(f=>WCOLS.includes(f)&&TYPES[f]==='numeric');
+  if(!feats.length)return toast('Pick at least one numeric feature');
+  const idx=[];WORK.forEach((r,i)=>{if(feats.every(f=>typeof r[f]==='number'))idx.push(i);});
+  if(idx.length<KM.k)return toast('Not enough complete rows for that many clusters');
+  const st=feats.map(f=>{const v=idx.map(i=>WORK[i][f]);return [mean(v),std(v)||1];});
+  const X=idx.map(i=>feats.map((f,j)=>(WORK[i][f]-st[j][0])/st[j][1]));
+  const sample=X.length>3000?X.filter((_,i)=>i%Math.ceil(X.length/3000)===0):X;
+  const elbow=[];for(let k=1;k<=Math.min(8,sample.length);k++)elbow.push(kmeans(sample,k).inertia);
+  const res=kmeans(X,KM.k),labels=new Array(WORK.length).fill(null);idx.forEach((i,j)=>labels[i]=res.labels[j]);
+  const sizes=new Array(KM.k).fill(0);res.labels.forEach(l=>sizes[l]++);
+  CLUSTER={feats,k:KM.k,labels,elbow,sizes};
+  WORK.forEach((r,i)=>r[CL]=labels[i]===null?null:'Cluster '+(labels[i]+1));
+  if(!WCOLS.includes(CL))WCOLS.push(CL);TYPES[CL]='categorical';
+  updateStatus();renderMining();toast(`K-means done: ${KM.k} clusters on ${idx.length} rows`);
+}
+function drawCluster(){
+  if(!CLUSTER||!$('#mine-km-scatter'))return;
+  const P=pal(),x=KM.x,y=KM.y,data=[];
+  for(let c=0;c<CLUSTER.k;c++){
+    const rs=WORK.filter((r,i)=>CLUSTER.labels[i]===c&&typeof r[x]==='number'&&typeof r[y]==='number');
+    data.push({type:'scatter',mode:'markers',name:'Cluster '+(c+1),x:rs.map(r=>r[x]),y:rs.map(r=>r[y]),marker:{color:P[c%P.length],size:9,opacity:.8,line:{color:'#fff',width:.7}}});
+    if(rs.length)data.push({type:'scatter',mode:'markers',showlegend:false,hoverinfo:'skip',x:[mean(rs.map(r=>r[x]))],y:[mean(rs.map(r=>r[y]))],marker:{symbol:'x',size:18,color:'#1f2340',line:{width:2}}});
+  }
+  plot('mine-km-scatter',data,{xaxis:{title:{text:x}},yaxis:{title:{text:y}}},`K-means clusters (k = ${CLUSTER.k}) · ✕ = centroid`);
+  const ks=CLUSTER.elbow.map((_,i)=>i+1);
+  plot('mine-km-elbow',[{type:'scatter',mode:'lines+markers',x:ks,y:CLUSTER.elbow,line:{color:P[1],width:3,shape:'spline'},marker:{size:ks.map(k=>k===CLUSTER.k?16:8),color:ks.map(k=>k===CLUSTER.k?P[0]:P[1])}}],{xaxis:{title:{text:'k'},dtick:1},yaxis:{title:{text:'within-cluster SSE'}}},'Elbow method (pick the bend)');
+  plot('mine-km-sizes',[{type:'bar',x:CLUSTER.sizes.map((_,i)=>'Cluster '+(i+1)),y:CLUSTER.sizes,marker:{color:CLUSTER.sizes.map((_,i)=>P[i%P.length])},text:CLUSTER.sizes,textposition:'outside'}],{yaxis:{title:{text:'rows'}}},'Cluster sizes');
+}
+function renderMining(){
+  const p=$('#tab-mine');if(!guard(p))return;
+  Object.keys(CHARTS).filter(k=>k.startsWith('mine-')).forEach(k=>delete CHARTS[k]);
+  ensureB();
+  const all=WCOLS,nn=numNo(),cc=catCols().filter(c=>c!==CL&&uniq(c)<=60),dc=WCOLS.filter(c=>TYPES[c]==='date');
+  if(!KM.feats)KM.feats=nn.slice(0,4);if(!KM.k)KM.k=3;
+  if(!KM.x||!numCols().includes(KM.x))KM.x=KM.feats[0]||nn[0];if(!KM.y||!numCols().includes(KM.y))KM.y=KM.feats[1]||nn[1]||KM.x;
+  const types=[['auto','✨ Auto (best guess)'],['bar','Bar'],['hbar','Horizontal bar'],['line','Line'],['area','Area'],['pie','Pie / donut'],['scatter','Scatter + trend'],['bubble','Bubble'],['histogram','Histogram'],['box','Box plot'],['violin','Violin'],['heatmap','Heatmap'],['sunburst','Sunburst'],['scatter3d','3D scatter']];
+  const corr=nn.length>=2,splom=nn.length>=2,grp=cc.length&&nn.length;
+  p.innerHTML=stephead(4,'Data Mining','Discover patterns: build any chart, scan the auto-dashboard, and find groups with k-means clustering.')+
+  `<div class="card"><h3>🛠️ Chart builder</h3><div class="row">
+    <label>Chart <select id="bType">${types.map(([v,t])=>`<option value="${v}" ${B.type===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label>X <select id="bX">${opts(all,B.x)}</select></label>
+    <label>Y <select id="bY">${opts(all,B.y,true)}</select></label>
+    <label>Z / size <select id="bZ">${opts(nn,B.z,true)}</select></label>
+    <label>Colour by <select id="bColor">${opts(all,B.color,true)}</select></label>
+    <label>Aggregate <select id="bAgg">${['mean','sum','median','count','min','max'].map(a=>`<option ${B.agg===a?'selected':''}>${a}</option>`).join('')}</select></label>
+    <label>Date group <select id="bBucket">${['day','month','year'].map(a=>`<option ${B.bucket===a?'selected':''}>${a}</option>`).join('')}</select></label></div>
+    <p class="hint" id="bMsg"></p><div class="chart tall" id="mine-builder"></div></div>
+  <h2 class="sec">⚡ Auto dashboard</h2>
+  <div class="grid">
+    ${nn.slice(0,8).map((c,i)=>`<div class="card"><div class="chart" id="mine-h-${i}"></div></div>`).join('')}
+    ${cc.slice(0,6).map((c,i)=>`<div class="card"><div class="chart" id="mine-c-${i}"></div></div>`).join('')}
+    ${dc.slice(0,1).map(()=>`<div class="card wide"><div class="chart" id="mine-d-0"></div></div>`).join('')}
+    ${grp?`<div class="card"><div class="chart" id="mine-grp"></div></div>`:''}
+    ${corr?`<div class="card wide"><div class="chart tall" id="mine-corr"></div></div>`:''}
+    ${splom?`<div class="card wide"><div class="chart tall" id="mine-splom"></div></div>`:''}
+  </div>
+  <div class="card"><h3>🧩 K-means clustering</h3><p class="hint">Pick numeric features and k, then run. Features are z-scored internally; results are added as a <b>${CL}</b> column you can colour charts by and export.</p>
+    ${nn.length?`<div class="checks">${nn.map((c,i)=>`<label class="check t-numeric"><input type="checkbox" data-km="${i}" ${KM.feats.includes(c)?'checked':''}><span>${esc(c)}</span></label>`).join('')}</div>
+    <div class="row"><label>k <input type="number" id="kmK" min="2" max="10" value="${KM.k}" style="width:70px"></label><button class="btn grad" id="kmRun">▶ Run clustering</button>
+    ${CLUSTER?`<label>Plot X <select id="kmX">${opts(numCols(),KM.x)}</select></label><label>Plot Y <select id="kmY">${opts(numCols(),KM.y)}</select></label>`:''}</div>
+    ${CLUSTER?`<div class="grid"><div class="card wide"><div class="chart tall" id="mine-km-scatter"></div></div><div class="card"><div class="chart" id="mine-km-elbow"></div></div><div class="card"><div class="chart" id="mine-km-sizes"></div></div></div>`:''}`:'<p class="hint">No numeric columns available.</p>'}
+  </div>`;
+  [['bType','type'],['bX','x'],['bY','y'],['bZ','z'],['bColor','color'],['bAgg','agg'],['bBucket','bucket']].forEach(([id,k])=>$('#'+id).onchange=e=>{B[k]=e.target.value;drawBuilder();});
+  drawBuilder();
+  const P=pal();
+  nn.slice(0,8).forEach((c,i)=>plot(`mine-h-${i}`,[{type:'histogram',x:col(c),marker:{color:P[i%P.length],line:{color:'#fff',width:1}}}],{xaxis:{title:{text:c}},yaxis:{title:{text:'count'}}},`Distribution of ${c}`));
+  cc.slice(0,6).forEach((c,i)=>{const k=counts(c).slice(0,12);plot(`mine-c-${i}`,[{type:'bar',orientation:'h',y:k.map(t=>String(t[0])),x:k.map(t=>t[1]),marker:{color:k.map((_,j)=>P[(j+i)%P.length])},text:k.map(t=>t[1]),textposition:'auto'}],{yaxis:{autorange:'reversed',automargin:true,type:'category'},xaxis:{title:{text:'rows'}}},`Top values of ${c}`);});
+  if(dc.length&&$('#mine-d-0')){const d=dc[0],y=nn[0];const m=new Map();WORK.forEach(r=>{const k=keyOf(r,d,'month');if(k===null)return;if(!m.has(k))m.set(k,[]);m.get(k).push(r);});const ks=[...m.keys()].sort();
+    const tr=[{type:'scatter',mode:'lines+markers',name:'rows',x:ks,y:ks.map(k=>m.get(k).length),fill:'tozeroy',line:{color:P[2],width:3,shape:'spline'}}];
+    if(y)tr.push({type:'scatter',mode:'lines+markers',name:'avg '+y,yaxis:'y2',x:ks,y:ks.map(k=>{const v=col(y,m.get(k));return v.length?mean(v):null;}),line:{color:P[0],width:3,shape:'spline'}});
+    plot('mine-d-0',tr,{yaxis:{title:{text:'rows per month'}},yaxis2:{overlaying:'y',side:'right',title:{text:y?'avg '+y:''}}},`Trend over time (${d}, by month)`);}
+  if(grp){const g=cc[0],v=nn[nn.length-1];plot('mine-grp',groupRows(WORK,g,12).map(([k,rs],i)=>({type:'box',name:String(k),y:col(v,rs),marker:{color:P[i%P.length]},boxmean:true})),{showlegend:false,yaxis:{title:{text:v}},xaxis:{type:'category'}},`${v} by ${g}`);}
+  if(corr){const c=nn.slice(0,20),Z=c.map(a=>c.map(b=>a===b?1:pearson(a,b)));plot('mine-corr',[{type:'heatmap',x:c,y:c,z:Z,zmin:-1,zmax:1,colorscale:CORR_SCALE,texttemplate:'%{z:.2f}',hovertemplate:'%{y} ↔ %{x}: %{z:.3f}<extra></extra>'}],{xaxis:{automargin:true},yaxis:{automargin:true,autorange:'reversed'}},'Correlation matrix (Pearson r)');}
+  if(splom){const dims=nn.slice(0,5),cg=catCols().find(c=>uniq(c)<=10&&uniq(c)>1);let colors=P[1];if(cg){const ks=counts(cg).map(k=>k[0]),ix=new Map(ks.map((k,i)=>[k,i]));colors=WORK.map(r=>r[cg]===null?'#cccccc':P[ix.get(r[cg])%P.length]);}
+    plot('mine-splom',[{type:'splom',dimensions:dims.map(d=>({label:d,values:WORK.map(r=>r[d])})),showupperhalf:false,diagonal:{visible:false},marker:{color:colors,size:5,opacity:.7,line:{color:'#fff',width:.4}}}],{dragmode:'select',hovermode:'closest'},`Scatter matrix${cg?' · coloured by '+cg:''}`);}
+  p.querySelectorAll('[data-km]').forEach(cb=>cb.onchange=()=>{const c=nn[+cb.dataset.km];KM.feats=cb.checked?[...KM.feats,c]:KM.feats.filter(f=>f!==c);});
+  if($('#kmK'))$('#kmK').onchange=e=>{KM.k=Math.max(2,Math.min(10,parseInt(e.target.value)||3));};
+  if($('#kmRun'))$('#kmRun').onclick=runKM;
+  if($('#kmX'))$('#kmX').onchange=e=>{KM.x=e.target.value;drawCluster();};
+  if($('#kmY'))$('#kmY').onchange=e=>{KM.y=e.target.value;drawCluster();};
+  drawCluster();
+}
+
+/* ============ Step 5: Interpretation ============ */
+function insights(){
+  const out=[],nc=numNo(),cc=catCols().filter(c=>c!==CL);
+  out.push(['📦',`After the KDD pipeline the dataset has <b>${WORK.length.toLocaleString()}</b> rows and <b>${WCOLS.length}</b> columns (${numCols().length} numeric, ${catCols().length} categorical).`]);
+  if(TARGET.length!==PRE.length)out.push(['🧹',`Cleaning removed <b>${(TARGET.length-PRE.length).toLocaleString()}</b> rows (${(100*(TARGET.length-PRE.length)/TARGET.length).toFixed(1)}% of the target data).`]);
+  corrPairs().slice(0,3).forEach(([a,b,r])=>{const s=Math.abs(r)>=.7?'strong':Math.abs(r)>=.4?'moderate':'weak';out.push(['🔗',`<b>${esc(a)}</b> and <b>${esc(b)}</b> show a ${s} ${r>0?'positive':'negative'} relationship (r = ${r.toFixed(2)}).`]);});
+  nc.forEach(c=>{const v=col(c);if(v.length>3){const s=skew(v);if(Math.abs(s)>1)out.push(['📐',`<b>${esc(c)}</b> is ${s>0?'right':'left'}-skewed (skew = ${s.toFixed(2)})${S.scaling==='log'?'':' — a log transform may help'}.`]);}});
+  cc.forEach(c=>{const k=counts(c);if(k.length>1&&k.length<=50){const tot=k.reduce((s,x)=>s+x[1],0),sh=k[0][1]/tot;if(sh>=.5)out.push(['⚖️',`<b>${esc(c)}</b> is imbalanced: “${esc(k[0][0])}” makes up ${(sh*100).toFixed(0)}% of rows.`]);}});
+  if(cc.length&&nc.length){const g=cc.find(c=>uniq(c)>=2&&uniq(c)<=12);if(g){const v=nc[nc.length-1],gs=groupRows(WORK,g,12).filter(x=>x[0]!=='Other').map(([k,rs])=>[k,col(v,rs)]).filter(x=>x[1].length).map(([k,a])=>[k,mean(a)]).sort((a,b)=>b[1]-a[1]);
+    if(gs.length>1)out.push(['🏆',`Highest average <b>${esc(v)}</b> is in ${esc(g)} = “${esc(gs[0][0])}” (${fmt(gs[0][1])}); lowest is “${esc(gs[gs.length-1][0])}” (${fmt(gs[gs.length-1][1])}).`]);}}
+  COLS.filter(c=>S.selected.has(c)).forEach(c=>{const m=RAW.length?RAW.filter(r=>r[c]===null).length/RAW.length:0;if(m>=.1)out.push(['🕳️',`<b>${esc(c)}</b> was ${(m*100).toFixed(0)}% missing in the raw data — treat conclusions about it with care.`]);});
+  if(CLUSTER)out.push(['🧩',`K-means (k = ${CLUSTER.k}) on ${CLUSTER.feats.map(esc).join(', ')} produced clusters of size ${CLUSTER.sizes.join(', ')}.`]);
+  return out;
+}
+const insightsHTML=()=>`<ul class="insights">${insights().map(([ic,t],i)=>`<li style="border-color:${pal()[i%pal().length]}"><span>${ic}</span><div>${t}</div></li>`).join('')}</ul>`;
+function numStatsHTML(){
+  const nc=numCols();if(!nc.length)return '<p class="hint">No numeric columns.</p>';
+  const rows=nc.map(c=>{const v=col(c).sort((a,b)=>a-b),n=v.length;return {Column:c,Count:n,Missing:WORK.length-n,Mean:n?mean(v):null,Std:n>1?std(v):null,Min:n?v[0]:null,Q1:n?quant(v,.25):null,Median:n?quant(v,.5):null,Q3:n?quant(v,.75):null,Max:n?v[n-1]:null,Skew:n>2?skew(v):null};});
+  return tableHTML(rows,Object.keys(rows[0]));
+}
+function catStatsHTML(){
+  const cc=catCols();if(!cc.length)return '<p class="hint">No categorical columns.</p>';
+  const rows=cc.map(c=>{const k=counts(c),n=k.reduce((s,x)=>s+x[1],0);return {Column:c,Count:n,Missing:WORK.length-n,Unique:k.length,'Top value':k[0]?k[0][0]:null,'Top freq':k[0]?k[0][1]:null,'Top %':k[0]?+(100*k[0][1]/n).toFixed(1):null};});
+  return tableHTML(rows,Object.keys(rows[0]));
+}
+function renderInterpret(){
+  const p=$('#tab-interp');if(!guard(p))return;
+  const pairs=corrPairs().slice(0,10);
+  p.innerHTML=stephead(5,'Interpretation / Evaluation → Knowledge','Turn the patterns into knowledge: automatic insights, summary statistics and cluster profiles.')+
+  `<div class="kpis">${kpi('Raw rows',RAW.length,0)}${kpi('Final rows',WORK.length,2)}${kpi('Columns used',WCOLS.length,1)}${kpi('Insights',insights().length,4)}${CLUSTER?kpi('Clusters',CLUSTER.k,3):''}</div>
+  <div class="card"><h3>💡 Key insights</h3>${insightsHTML()}</div>
+  <div class="card"><h3>🛤️ KDD journey</h3><ul class="log">${LOG.map(l=>`<li>${esc(l)}</li>`).join('')}${CLUSTER?`<li>Data mining: k-means clustering, k = ${CLUSTER.k}</li>`:''}</ul></div>
+  <div class="grid">${pairs.length?`<div class="card"><div class="chart" id="interp-corr"></div></div>`:''}${CLUSTER?`<div class="card"><div class="chart" id="interp-profile"></div></div>`:''}</div>
+  <div class="card"><h3>📏 Numeric summary</h3>${numStatsHTML()}</div>
+  <div class="card"><h3>🏷️ Categorical summary</h3>${catStatsHTML()}</div>`;
+  if(pairs.length)plot('interp-corr',[{type:'bar',orientation:'h',y:pairs.map(([a,b])=>`${a} ↔ ${b}`),x:pairs.map(x=>x[2]),marker:{color:pairs.map(x=>x[2]>0?'#FF006E':'#3A86FF')},text:pairs.map(x=>x[2].toFixed(2)),textposition:'auto'}],{yaxis:{autorange:'reversed',automargin:true},xaxis:{range:[-1,1],title:{text:'Pearson r'}}},'Strongest relationships');
+  if(CLUSTER){const f=CLUSTER.feats,ks=[...Array(CLUSTER.k).keys()];
+    const M=ks.map(c=>f.map(x=>{const v=WORK.filter((r,i)=>CLUSTER.labels[i]===c&&typeof r[x]==='number').map(r=>r[x]);return v.length?mean(v):0;}));
+    const Zs=M.map(row=>row.map((v,j)=>{const colv=M.map(r=>r[j]),m=mean(colv),s=std(colv)||1;return (v-m)/s;}));
+    plot('interp-profile',[{type:'heatmap',x:f,y:ks.map(c=>'Cluster '+(c+1)),z:Zs,text:M.map(r=>r.map(v=>fmt(v))),texttemplate:'%{text}',colorscale:CORR_SCALE,zmid:0,hovertemplate:'%{y} · %{x}: %{text}<extra></extra>',colorbar:{title:{text:'relative'}}}],{xaxis:{automargin:true},yaxis:{type:'category'}},'Cluster profiles (mean of each feature)');}
+}
+const RENDER={data:renderData,select:renderSelection,prep:renderPrep,transform:renderTransform,mine:renderMining,interp:renderInterpret};
+function showTab(t){currentTab=t;document.querySelectorAll('.step').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+t));RENDER[t]();}
+
+/* ============ export ============ */
+function download(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+function exportHTML(){
+  if(!RAW.length)return toast('Load a dataset first');
+  const cur=currentTab;Object.keys(CHARTS).forEach(k=>delete CHARTS[k]);
+  ['data','prep','transform','mine','interp'].forEach(t=>RENDER[t]());
+  const order=[['data-','📊 Data overview'],['prep-','🧹 Preprocessing'],['tr-','🔄 Transformation'],['mine-','⛏️ Data mining'],['interp-','💡 Interpretation']];
+  const wide=id=>/builder|corr$|splom|tr-all|prep-missing|km-scatter|mine-d-0/.test(id);
+  const charts=Object.entries(CHARTS).filter(([id])=>document.getElementById(id));const specs=[];let body='';
+  order.forEach(([pre,title])=>{const cs=charts.filter(([id])=>id.startsWith(pre));if(!cs.length)return;
+    body+=`<h2 class="sec">${title}</h2><div class="grid">`+cs.map(([id,c])=>{specs.push({id:'x-'+id,data:c.data,layout:c.layout});return `<div class="card${wide(id)?' wide':''}"><div id="x-${id}" class="chart${wide(id)?' tall':''}"></div></div>`;}).join('')+'</div>';});
+  const css=document.getElementById('app-css').textContent;
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(NAME)} — KDD Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"><\/script><style>${css}</style></head><body>
+<header><div><h1>📊 ${esc(NAME)} — KDD Dashboard</h1><p>Generated ${esc(new Date().toLocaleString())} · ${RAW.length.toLocaleString()} raw rows → ${WORK.length.toLocaleString()} rows · ${WCOLS.length} columns</p></div></header><main>
+<div class="kpis">${kpi('Raw rows',RAW.length,0)}${kpi('Final rows',WORK.length,2)}${kpi('Columns',WCOLS.length,1)}${kpi('Numeric',numCols().length,3)}${kpi('Categorical',catCols().length,4)}${CLUSTER?kpi('Clusters',CLUSTER.k,5):''}</div>
+<div class="card"><h3>💡 Key insights</h3>${insightsHTML()}</div>
+<div class="card"><h3>🛤️ KDD pipeline applied</h3><ul class="log">${LOG.map(l=>`<li>${esc(l)}</li>`).join('')}${CLUSTER?`<li>Data mining: k-means clustering, k = ${CLUSTER.k}</li>`:''}</ul></div>
+${body}
+<h2 class="sec">📏 Summary statistics</h2><div class="card"><h3>Numeric</h3>${numStatsHTML()}</div><div class="card"><h3>Categorical</h3>${catStatsHTML()}</div>
+<div class="card"><h3>Data preview <small>(first 100 rows after pipeline)</small></h3>${tableHTML(WORK.slice(0,100),WCOLS)}</div>
+</main><script>const CH=${JSON.stringify(specs).replace(/</g,'\\u003c')};CH.forEach(c=>Plotly.newPlot(c.id,c.data,c.layout,{responsive:true,displaylogo:false,toImageButtonOptions:{format:'png',scale:2}}));<\/script></body></html>`;
+  download(NAME.replace(/\.[^.]+$/,'').replace(/[^\w-]+/g,'_')+'_dashboard.html',html,'text/html');
+  showTab(cur);toast('Dashboard downloaded ✔');
+}
+
+/* ============ wiring ============ */
+$('#palette').innerHTML=Object.entries(PALETTES).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('');
+$('#palette').onchange=e=>{S.palette=e.target.value;RENDER[currentTab]();};
+document.querySelectorAll('.step').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+const dz=$('#drop');dz.onclick=()=>$('#file').click();
+$('#file').onchange=e=>{if(e.target.files[0])readFile(e.target.files[0]);e.target.value='';};
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('over')));
+dz.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)readFile(f);});
+window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('drop',e=>e.preventDefault());
+document.querySelectorAll('[data-sample]').forEach(b=>b.onclick=()=>b.dataset.sample==='students'?loadRows(sampleStudents(),'student_performance.csv'):loadRows(sampleSales(),'retail_sales_2025.csv'));
+$('#loadUrl').onclick=loadUrl;
+$('#dlHtml').onclick=exportHTML;
+$('#dlCsv').onclick=()=>{if(!WORK.length)return toast('Load a dataset first');download(NAME.replace(/\.[^.]+$/,'')+'_clean.csv',Papa.unparse(WORK,{columns:WCOLS}),'text/csv');};
+if(typeof Plotly==='undefined')toast('Charts need an internet connection the first time (Plotly CDN).');
+loadRows(sampleStudents(),'student_performance.csv');
+</script>
+</body>
+</html>
